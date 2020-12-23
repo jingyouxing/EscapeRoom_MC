@@ -1,23 +1,22 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
+#include <getopt.h>
+#include "head.h"
+
+//#include <errno.h>
 //#include <pthread.h>
 //#include <sys/socket.h>
 //#include <sys/types.h>
 //#include <netinet/in.h>
 //#include <arpa/inet.h>
-#include "log.h"
 
 #define VERSION     0.10
 //#define PORTEMD     7070
 
 //#define IP_SIZE		16
 
-/*
-int pid_ermc_web, pid_ermc_ermd;
 
+//int pid_ermc_web, pid_ermc_ermd;
+
+/*
 void *client(void *num)
 {
 	int sockfd = *(int*)num;
@@ -34,6 +33,19 @@ void *client(void *num)
 }
 */
 
+
+int display_usage()
+{
+	printf("\nUsage: ermc [OPTIONS] [cmd [arg [arg ...]]] \n");
+	printf("  --web                 Disable web \n");
+	printf("  --ermd                Disable ermd \n");
+	printf("  -d                    Enable debug infomation \n");
+	printf("  -h/--help             Help\n");
+	printf("When no command is given, ermc starts with configuration default. (Recommend) \n\n");
+	return 0;
+}
+
+
 /*************************************************************************
 * multi process 
 * parent : ermc, 
@@ -44,16 +56,75 @@ void *client(void *num)
 
 int main(int argc, char** argv)
 {
+	//Initialisation
+	int oc;
+	int flag_web, flag_ermd;
+	int flag_option=0; 
+	float version = VERSION;
+	int option_index = 0;
+	static struct option long_options[] =
+	{
+		{"ermd", no_argument, 0, 0}, 
+		{"web", no_argument, 0, 0},
+		{"debug", no_argument, 0, 'd'},
+		{"help", no_argument, 0, 'h'},
+		{0, 0, 0, 0}
+	};
+	
+	if (argc ==1)
+	{
+		flag_ermd = 1;
+		flag_web = 1;
+		flag_option = 1;
+	}else if(argc>1)
+	{
+		flag_option = 2;
+		while((oc = getopt_long(argc, argv, "dh",long_options, &option_index)) != -1)
+		{
+			switch(oc)
+			{
+				case 0:
+					if (strcmp(long_options[option_index].name, "ermd") == 0)
+						flag_ermd = 0;
+					else if (strcmp(long_options[option_index].name, "web") == 0)
+						flag_web = 0;
+					break;
+				case 'd': 
+					enable_debug();
+					printf("d\n");
+					break;
+				case 'h': 
+				case '?': 
+					flag_option = 0;
+					break;
+				default: 
+					break;
+			}
+		}		
+	}
+	
+	if(flag_option==0)
+	{
+		display_usage();
+		exit(1);
+	}
+	
 	//int sockfd_server, socked_client;
 	//struct sockaddr_in server_addr,client_addr;	
-	float version = VERSION;
+	
 	//int reuse = 1;
 	
 	log_info("----------------------------------------------------------------------------\n");
 	log_info("AMC version: %.2f \n", version);
-	
 	log_debug("hello\n");
-	
+
+/*	
+	pid_t pid_ermd, pid_web;
+	int pid_ermc = getpid();
+	log_info("[ermc] Parent process ermc: %d. \n", pid_ermc);
+	pid_ermc_web = 0;
+	pid_ermc_ermd = 0;
+*/	
 /*	
 	// create a new sccket  (AF_INET: IPv4)
 	if((sockfd_server=socket(AF_INET,SOCK_STREAM,0))<0)  

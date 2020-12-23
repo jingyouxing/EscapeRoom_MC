@@ -13,6 +13,7 @@ extern int log_lin;
 extern const char *log_fun;
 extern int log_lev;
 
+void enable_debug();
 int write_log(const char *file, const char * fmt, ...);
 
 #define DEBUG     0

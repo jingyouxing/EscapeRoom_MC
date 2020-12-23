@@ -10,7 +10,12 @@ int log_lin = 0;
 const char *log_fun = NULL;
 int log_lev = 0; 
 
-int flag_debug = 1;
+int flag_debug = 0;
+
+void enable_debug()
+{
+	flag_debug = 1;
+}
 
 int get_log(char *log_message)
 {
