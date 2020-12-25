@@ -39,6 +39,9 @@ int get_log(char *log_message)
 		case INFO:
 			sprintf(str, "[INFO] ");
 			break;
+		case FATAL:
+			sprintf(str, "[FATAL] %s:%d:%s()", log_file, log_lin,log_fun);
+			break;
 		default: break;
 	}
 	
@@ -76,6 +79,10 @@ int write_log(const char *file, const char * fmt, ...)
 			printf("%s",buffer);
 			//ret = write_log_file(file, buffer);
 			break;	
+		case FATAL:
+			printf("%s",buffer);
+			//ret = write_log_file(file, buffer);
+			break;
 		default: break;
 	}
 }

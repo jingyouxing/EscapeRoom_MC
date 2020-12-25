@@ -1,4 +1,5 @@
 #include <getopt.h>
+#include <sys/prctl.h>
 #include "head.h"
 
 //#include <errno.h>
@@ -14,7 +15,18 @@
 //#define IP_SIZE		16
 
 
-//int pid_ermc_web, pid_ermc_ermd;
+int pid_ermc_web, pid_ermc_ermd;
+
+void ParentCycle()
+{
+	printf("Parent process %d\n", getpid());
+	//signal(SIGCHLD, sub_quit_signal_handle);
+	//signal(SIGSEGV,sig_segv_handler); 
+	//signal(SIGINT, sig_close_handler);
+	//atexit(server_on_exit);
+	while(1)
+		pause();
+}
 
 /*
 void *client(void *num)
@@ -109,23 +121,83 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 	
-	//int sockfd_server, socked_client;
-	//struct sockaddr_in server_addr,client_addr;	
-	
-	//int reuse = 1;
 	
 	log_info("----------------------------------------------------------------------------\n");
 	log_info("AMC version: %.2f \n", version);
 	log_debug("hello\n");
-
-/*	
+	
+	
 	pid_t pid_ermd, pid_web;
 	int pid_ermc = getpid();
+	int ret;
 	log_info("[ermc] Parent process ermc: %d. \n", pid_ermc);
 	pid_ermc_web = 0;
 	pid_ermc_ermd = 0;
-*/	
+	
+	if(flag_ermd)
+	{
+		//creat a new process ermc_ermd
+		pid_ermd = fork();
+		if(pid_ermd<0)
+		{
+			log_fatal("Error in fork pid_ermd! \n");
+			exit(1);
+		}
+		else if (pid_ermd ==0)  //child process pid_amd because return value zero
+		{ 
+			log_info("[pid_ermd] Child process ermc_ermd: %d. \n", getpid());
+			//rename process
+			prctl(PR_SET_NAME, "ermc_ermd");
+			//child process dies when parent dies
+			prctl(PR_SET_PDEATHSIG, SIGHUP);
+			//ret = interface_ermd();
+			while(1);
+			return ret;
+		}
+		else //parent process 
+		{
+			//pro[AMC_AMD].nb = 1;
+			//time(&(pro[AMC_AMD].timestamp));
+		}
+		pid_ermc_ermd = pid_ermd;
+	}
+	if(flag_web)
+	{
+		pid_web = fork();
+		if(pid_web<0)
+		{
+			log_fatal("Error in fork ermc_web!\n");
+			exit(1);
+		}
+		else if (pid_web ==0)  //child process ermc_web
+		{
+			//exec();
+			log_info("[ermc_web] Child process ermc_web: %d. \n", getpid());
+			//rename process
+			prctl(PR_SET_NAME, "ermc_web");
+			//child process dies when parent dies
+			prctl(PR_SET_PDEATHSIG, SIGHUP);
+			while(1);
+			//ret = interface_acca();
+			return ret;
+		}
+		else //parent process 
+		{
+			//pro[AMC_ACCA].nb = 1;
+			//time(&(pro[AMC_ACCA].timestamp));
+		}
+		pid_ermc_web = pid_web;
+	}
+	
+	ParentCycle();
+}
+	
 /*	
+
+//int sockfd_server, socked_client;
+	//struct sockaddr_in server_addr,client_addr;	
+	
+	//int reuse = 1;
 	// create a new sccket  (AF_INET: IPv4)
 	if((sockfd_server=socket(AF_INET,SOCK_STREAM,0))<0)  
 	{  
@@ -175,5 +247,5 @@ int main(int argc, char** argv)
 			break;
 		}
 	}
-	*/
-}
+	
+}*/
