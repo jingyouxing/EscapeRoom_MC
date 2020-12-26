@@ -100,6 +100,115 @@ void ParentCycle()
 		pause();
 }
 
+int iniRedis()
+{
+	redisContext* conn;
+	redisReply* reply;
+	
+	conn = redisConnect("127.0.0.1", 6379);  
+    if(conn->err)   
+	{
+		log_fatal("Redis connection error: %s. \n", conn->errstr);
+		return -1;
+	}
+	
+	reply = redisCommand(conn, "select 0");
+	reply = redisCommand(conn, "flushdb"); 
+	freeReplyObject(reply);
+	redisFree(conn);
+	return 0;
+}
+
+int import_ermd(char *file_name)
+{
+	FILE *fp;
+	char buffer[200];	
+	int ret;
+	
+	fp=fopen(file_name,"r");
+	if (!fp) 
+	{
+		log_fatal("Failed to open file %s for reading : %s \n", file_name, strerror(errno));
+        return -1;
+    }
+	if(fgets(buffer, sizeof(buffer), fp)==NULL)
+	{
+		log_fatal("The file %s is null \n", file_name);
+		fclose(fp);
+        return -1;
+	}
+	
+	redisContext* conn;
+	redisReply* reply;
+	char *result = NULL;
+	char ermd_ip[IP_SIZE];
+	char ermd_mac[MAC_SIZE];
+	int type,num=0;
+	int nb_ermd = 0;
+	
+	conn = redisConnect("127.0.0.1", 6379);  
+    if(conn->err)   
+	{
+		log_fatal("Redis connection error: %s. \n", conn->errstr);
+		return -3;
+	}
+	
+	while(fgets(buffer, sizeof(buffer), fp) != NULL) 
+	{
+		int count=0;
+		char *commandArr[20]; 
+		result = strtok(buffer, ",");
+		while( result != NULL ) 
+		{
+			switch(count)
+			{
+				case 0:
+					strcpy(ermd_mac,result);
+					break;
+				case 1:
+					strcpy(ermd_ip,result);
+					break;
+				case 2:
+					type =atoi(result);
+					break;
+				case 3:
+					num =atoi(result);
+					break;
+				default: 
+					break;
+			}
+			if(count>=4)
+			{
+				commandArr[count-4]=(char*)malloc(MAC_SIZE*sizeof(char));
+				if (count==(3+num)) //last parametre
+					result[strlen(result)-2] = '\0';
+				strcpy(commandArr[count-4],result);
+			}
+			result = strtok(NULL, ",");
+			count++;
+		}
+		//put the info in redis
+		reply = redisCommand(conn, "select 0");
+		reply = redisCommand(conn, "HSET %s  ip %s  type %d  active 0 time_conn 0 numCommand %d", ermd_mac, ermd_ip, type, num);
+		for (int i=0;i<num; i++)
+			reply = redisCommand(conn, "HSET %s command%d %s", ermd_mac, i, commandArr[i]);	
+		freeReplyObject(reply);
+		nb_ermd++;
+	}
+	if(nb_ermd>0)
+	{
+		log_info("Import %s OK, %d ERMDs.\n", file_name, nb_ermd);
+		ret = 0;
+	}
+	else 
+	{
+		log_fatal("Import 0 AMDs. \n");
+		ret = -1;
+	}
+	fclose(fp);
+	redisFree(conn); 
+	return 0;
+}
 
 int display_usage()
 {
@@ -125,12 +234,14 @@ int main(int argc, char** argv)
 {
 	//Initialisation
 	int oc;
+	char *file_name = NULL;
 	int flag_web, flag_ermd;
 	int flag_option=0; 
 	float version = VERSION;
 	int option_index = 0;
 	static struct option long_options[] =
 	{
+		{"file", required_argument, 0, 'f'},
 		{"ermd", no_argument, 0, 0}, 
 		{"web", no_argument, 0, 0},
 		{"debug", no_argument, 0, 'd'},
@@ -138,6 +249,7 @@ int main(int argc, char** argv)
 		{0, 0, 0, 0}
 	};
 	
+	file_name = (char*)calloc(100, sizeof(char));
 	flag_ermd = 1;
 	flag_web = 1;
 	flag_option = 1;
@@ -145,7 +257,7 @@ int main(int argc, char** argv)
 	if(argc>1)
 	{
 		flag_option = 2;
-		while((oc = getopt_long(argc, argv, "dh",long_options, &option_index)) != -1)
+		while((oc = getopt_long(argc, argv, "f:dh",long_options, &option_index)) != -1)
 		{
 			switch(oc)
 			{
@@ -158,6 +270,9 @@ int main(int argc, char** argv)
 						{
 							flag_web = 0;
 						}
+					break;
+				case 'f': 
+					strcpy(file_name, optarg);
 					break;
 				case 'd': 
 					enable_debug();
@@ -179,11 +294,17 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 	
+	if (*file_name == 0)
+		strcpy(file_name, "importedInfo.CSV");
 	
 	log_info("----------------------------------------------------------------------------\n");
 	log_info("AMC version: %.2f \n", version);
-	log_debug("hello\n");
 	
+	if(iniRedis()<0)
+	{
+		log_fatal("Redis error\n");
+		exit(1);
+	}
 	
 	pid_t pid_ermd, pid_web;
 	int pid_ermc = getpid();
@@ -194,6 +315,13 @@ int main(int argc, char** argv)
 	
 	if(flag_ermd)
 	{
+		if (import_ermd(file_name) <0)
+		{
+			log_fatal("Import %s KO.\n", file_name);
+			free(file_name);
+			exit(1);
+		}
+		free(file_name);
 		//creat a new process ermc_ermd
 		pid_ermd = fork();
 		if(pid_ermd<0)
@@ -247,4 +375,5 @@ int main(int argc, char** argv)
 	}
 	
 	ParentCycle();
+	return 0;
 }

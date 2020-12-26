@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <hiredis/hiredis.h>
 #include "log.h"
 
 //Process
@@ -22,6 +23,7 @@
 
 //ERMC
 #define IP_SIZE		16
+#define MAC_SIZE	18
 
 //Interface ERMC_ERMD
 #define PORTERMD  7070

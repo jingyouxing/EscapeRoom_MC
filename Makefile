@@ -1,5 +1,5 @@
 ermc: ermcmain.o log.o if_ermd.o
-	gcc -o ermc src/ermcmain.o src/log.o src/if_ermd.o -lpthread 
+	gcc -o ermc src/ermcmain.o src/log.o src/if_ermd.o -lpthread -lhiredis
 
 log.o: src/log.c
 	gcc -o src/log.o -c src/log.c

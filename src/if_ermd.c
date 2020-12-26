@@ -1,5 +1,7 @@
 #include "head.h"
 
+#define DEBUG_IFERMD
+
 void ermd_sig_segv_handler(int sig)
 {
     log_fatal("[ermc_ermd] segv_error(value: %d). \n", sig);
@@ -28,6 +30,7 @@ void *client(void *num)
 {
 	int sockfd = *(int*)num;
 	unsigned char *ip_ermd = NULL;
+	unsigned char *mac_ermd = NULL;
 	struct sockaddr_in addr;
 	socklen_t addr_len;
 	
@@ -37,6 +40,51 @@ void *client(void *num)
 	getpeername(sockfd, (struct sockaddr *)&addr, &addr_len);
 	sprintf(ip_ermd, "%s", inet_ntoa(addr.sin_addr));
 	log_debug("[emc_emd] sockfd : %d   ip: %s  \n", sockfd,ip_ermd);
+	
+	unsigned char recv_buf[200];
+	int recv_len;
+	struct timeval timeout;
+	fd_set fds;
+	
+	memset(recv_buf, 0, sizeof(recv_buf));
+
+	while(1)
+	{
+		timeout.tv_sec=0;  
+        timeout.tv_usec=200000; 
+		FD_ZERO(&fds);
+		FD_SET(sockfd,&fds);
+		switch(select(sockfd+1,&fds,NULL,NULL,&timeout))
+		{
+			case -1: 
+				//goto amd_close;
+				break;
+			case 0:
+				//printf("timeout\n");
+				break;
+			default:
+				if(FD_ISSET(sockfd,&fds))
+				{
+					if ((recv_len = recv(sockfd, recv_buf, sizeof(recv_buf), 0)) >0)
+					{
+#ifdef DEBUG_IFERMD
+						int i;
+						printf("[ermc_ermd] [ermd %s] recv_len : %d \n",ip_ermd, recv_len);
+						for (i = 0; i<recv_len; i++)
+							printf(" %02x ", recv_buf[i]);
+						printf("\n");
+#endif					
+						if(mac_ermd==NULL) //first message 
+						{
+							mac_ermd = (char *)malloc(MAC_SIZE*sizeof(char));
+							sprintf(mac_ermd, "%02x%02x%02x%02x%02x%02x", recv_buf[0], recv_buf[1],recv_buf[2], recv_buf[3], recv_buf[4], recv_buf[5]); 
+							
+						}
+					}
+				}
+				break;
+		}
+	}
 }
 
 
