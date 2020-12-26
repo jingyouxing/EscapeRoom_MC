@@ -1,49 +1,104 @@
 #include <getopt.h>
 #include <sys/prctl.h>
+#include <sys/wait.h>
 #include "head.h"
 
-//#include <errno.h>
-//#include <pthread.h>
-//#include <sys/socket.h>
-//#include <sys/types.h>
-//#include <netinet/in.h>
-//#include <arpa/inet.h>
-
 #define VERSION     0.10
-//#define PORTEMD     7070
-
-//#define IP_SIZE		16
-
 
 int pid_ermc_web, pid_ermc_ermd;
+Process pro[NM_PROCESS];
+
+void server_on_exit(void)
+{
+    log_info("ERMC closed : %d.\n",  getpid());
+}
+
+void sub_quit_signal_handle(int sig) 
+{   
+    pid_t pid;   
+	time_t now;
+	
+	if (sig == SIGCHLD) 
+	{   
+		pid = wait(NULL);
+		if (pid == pid_ermc_ermd)
+		{
+			log_fatal("ermc_ermd(%d) dead. \n", pid);
+			time(&now);
+			if((now-pro[ERMC_ERMD].timestamp)<30)
+				exit(1);
+			sleep(1);
+			int pid_ermd = fork();
+			int ret;
+			if(pid_ermd<0)
+			{
+				log_fatal("Error in fork pid_amd! \n");
+				exit(1);
+			}	
+			else if (pid_ermd ==0)  //child process pid_amd because return value zero
+			{ 
+				log_info("[pid_ermd] Child process ermc_ermd: %d. \n", getpid());
+				//rename process
+				prctl(PR_SET_NAME, "ermc_ermd");
+				//child process dies when parent dies
+				prctl(PR_SET_PDEATHSIG, SIGHUP);
+				//ret = interface_amd();
+				while(1);
+				return;
+			}
+			else //parent process 
+			{
+				pid_ermc_ermd = pid_ermd;
+				pro[ERMC_ERMD].nb = 1;
+				time(&(pro[ERMC_ERMD].timestamp));
+			}
+		}
+		else if(pid == pid_ermc_web)
+		{
+			log_fatal("ermc_web(%d) dead. \n", pid);
+			time(&now);
+			if((now-pro[ERMC_WEB].timestamp)<30)
+				exit(1);
+			sleep(1);
+			int pid_web = fork();
+			int ret;
+			if(pid_web<0)
+			{
+				log_fatal("Error in fork ermc_web!\n");
+				exit(1);
+			}
+			else if (pid_web ==0)  //child process ermc_web
+			{
+				//exec();
+				log_info("[ermc_web] Child process ermc_web: %d. \n", getpid());
+				//rename process
+				prctl(PR_SET_NAME, "ermc_web");
+				//child process dies when parent dies
+				prctl(PR_SET_PDEATHSIG, SIGHUP);
+				//ret = interface_acca();
+				while(1);
+				return;
+			}
+			else 
+			{
+				pid_ermc_web = pid_web;
+				pro[ERMC_WEB].nb=1;
+				time(&(pro[ERMC_WEB].timestamp));
+			}
+		}	
+    }   
+} 
 
 void ParentCycle()
 {
-	printf("Parent process %d\n", getpid());
-	//signal(SIGCHLD, sub_quit_signal_handle);
+	//printf("Parent process %d\n", getpid());
+	signal(SIGCHLD, sub_quit_signal_handle);
 	//signal(SIGSEGV,sig_segv_handler); 
 	//signal(SIGINT, sig_close_handler);
-	//atexit(server_on_exit);
+	atexit(server_on_exit);
 	while(1)
 		pause();
 }
-
-/*
-void *client(void *num)
-{
-	int sockfd = *(int*)num;
-	unsigned char *ip_emd = NULL;
-	struct sockaddr_in addr;
-	socklen_t addr_len;
-	
-	ip_emd = (char *)malloc(IP_SIZE*sizeof(char));
-	addr_len = sizeof(addr);
-	memset(&addr, 0, addr_len);
-	getpeername(sockfd, (struct sockaddr *)&addr, &addr_len);
-	sprintf(ip_emd, "%s", inet_ntoa(addr.sin_addr));
-	printf("[emc_emd] sockfd : %d   ip: %s  \n", sockfd,ip_emd);
-}
-*/
 
 
 int display_usage()
@@ -83,12 +138,11 @@ int main(int argc, char** argv)
 		{0, 0, 0, 0}
 	};
 	
-	if (argc ==1)
-	{
-		flag_ermd = 1;
-		flag_web = 1;
-		flag_option = 1;
-	}else if(argc>1)
+	flag_ermd = 1;
+	flag_web = 1;
+	flag_option = 1;
+	
+	if(argc>1)
 	{
 		flag_option = 2;
 		while((oc = getopt_long(argc, argv, "dh",long_options, &option_index)) != -1)
@@ -97,9 +151,13 @@ int main(int argc, char** argv)
 			{
 				case 0:
 					if (strcmp(long_options[option_index].name, "ermd") == 0)
+					{	
 						flag_ermd = 0;
+					}
 					else if (strcmp(long_options[option_index].name, "web") == 0)
-						flag_web = 0;
+						{
+							flag_web = 0;
+						}
 					break;
 				case 'd': 
 					enable_debug();
@@ -150,14 +208,13 @@ int main(int argc, char** argv)
 			prctl(PR_SET_NAME, "ermc_ermd");
 			//child process dies when parent dies
 			prctl(PR_SET_PDEATHSIG, SIGHUP);
-			//ret = interface_ermd();
-			while(1);
+			ret = interface_ermd();
 			return ret;
 		}
 		else //parent process 
 		{
-			//pro[AMC_AMD].nb = 1;
-			//time(&(pro[AMC_AMD].timestamp));
+			pro[ERMC_ERMD].nb = 1;
+			time(&(pro[ERMC_ERMD].timestamp));
 		}
 		pid_ermc_ermd = pid_ermd;
 	}
@@ -183,69 +240,11 @@ int main(int argc, char** argv)
 		}
 		else //parent process 
 		{
-			//pro[AMC_ACCA].nb = 1;
-			//time(&(pro[AMC_ACCA].timestamp));
+			pro[ERMC_WEB].nb = 1;
+			time(&(pro[ERMC_WEB].timestamp));
 		}
 		pid_ermc_web = pid_web;
 	}
 	
 	ParentCycle();
 }
-	
-/*	
-
-//int sockfd_server, socked_client;
-	//struct sockaddr_in server_addr,client_addr;	
-	
-	//int reuse = 1;
-	// create a new sccket  (AF_INET: IPv4)
-	if((sockfd_server=socket(AF_INET,SOCK_STREAM,0))<0)  
-	{  
-		printf("[emc_emd] create socket error: %s\n", strerror(errno));  
-		return -1; 
-	}
-	//create an interface
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;  //Address family
-	server_addr.sin_port = htons(PORTEMD);  //Port number 
-	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);  // Internet address
-	
-	if (setsockopt(sockfd_server, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
-	{
-		printf("[emc_emd]setsockopet error: %s\n",strerror(errno));
-		close(sockfd_server);
-		return -1;
-	}
-	if (bind(sockfd_server,(struct sockaddr *) &server_addr,sizeof(server_addr)) ==-1)
-	{
-		printf("[emc_emd] bind socket error: %s\n",strerror(errno));
-		close(sockfd_server);
-		return -1;
-	}
-	if(listen(sockfd_server,5) == -1)
-	{
-		printf("[emc_emd] listen socket error: %s\n",strerror(errno));
-		close(sockfd_server);
-		return -1;
-	}
-	while(1)
-	{
-		int ret;
-		pthread_t thread_id;
-		socklen_t cliaddr_len = sizeof(client_addr);
-		socked_client = accept(sockfd_server, (struct sockaddr*)&client_addr,&cliaddr_len);
-		if(socked_client<0)
-		{
-			printf("[emc_emd] accept socket error: %s\n",strerror(errno));
-			break;
-		}
-		
-		ret = pthread_create(&thread_id, NULL,(void *)client, &socked_client);
-		if(ret !=0)
-		{
-			printf("[emc_emd] pthread_create client error. \n");
-			break;
-		}
-	}
-	
-}*/
