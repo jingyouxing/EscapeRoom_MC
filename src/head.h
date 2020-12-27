@@ -24,9 +24,17 @@
 //ERMC
 #define IP_SIZE		16
 #define MAC_SIZE	18
+#define TIME_SIZE   20
 
 //Interface ERMC_ERMD
 #define PORTERMD  7070
+#define TYPE 6
+#define NUMALARM  7
+#define ENDALARM1 9
+#define ENDALARM2 10
+
+//Interface ERMC_web
+#define SIZE_ALARMID   19
 
 typedef struct process
 {
@@ -34,6 +42,16 @@ typedef struct process
 	time_t timestamp;
 }Process;
 
+typedef struct alarmRedis
+{
+	unsigned char *mac;
+	unsigned char time[TIME_SIZE];
+	unsigned char alarmID[SIZE_ALARMID];
+	int num;
+	int id;
+}Alarm;
+
 int interface_ermd();
+int get_json_id(unsigned char *id);
 
 #endif

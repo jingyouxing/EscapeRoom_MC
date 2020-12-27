@@ -114,6 +114,12 @@ int iniRedis()
 	
 	reply = redisCommand(conn, "select 0");
 	reply = redisCommand(conn, "flushdb"); 
+	
+	reply = redisCommand(conn, "select 1");
+	reply = redisCommand(conn, "flushdb");
+	reply = redisCommand(conn, "set mykey 0");
+	reply = redisCommand(conn, "set firstkey 1");
+	
 	freeReplyObject(reply);
 	redisFree(conn);
 	return 0;

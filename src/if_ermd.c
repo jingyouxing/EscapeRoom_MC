@@ -33,13 +33,22 @@ void *client(void *num)
 	unsigned char *mac_ermd = NULL;
 	struct sockaddr_in addr;
 	socklen_t addr_len;
+	redisContext* conn;
+	redisReply* reply;
 	
 	ip_ermd = (char *)malloc(IP_SIZE*sizeof(char));
 	addr_len = sizeof(addr);
 	memset(&addr, 0, addr_len);
 	getpeername(sockfd, (struct sockaddr *)&addr, &addr_len);
 	sprintf(ip_ermd, "%s", inet_ntoa(addr.sin_addr));
-	log_debug("[emc_emd] sockfd : %d   ip: %s  \n", sockfd,ip_ermd);
+	log_debug("[ermc_ermd] sockfd : %d   ip: %s  \n", sockfd,ip_ermd);
+	
+	conn = redisConnect("127.0.0.1", 6379);  
+    if(conn->err) 
+	{
+		log_error("[ermc_ermd] Redis connection error: %s. \n", conn->errstr);
+		goto amd_close;
+	}
 	
 	unsigned char recv_buf[200];
 	int recv_len;
@@ -67,8 +76,11 @@ void *client(void *num)
 				{
 					if ((recv_len = recv(sockfd, recv_buf, sizeof(recv_buf), 0)) >0)
 					{
-#ifdef DEBUG_IFERMD
-						int i;
+						unsigned char time_message[TIME_SIZE];
+						int i,type, num_alarm;
+						time_t time_seconds; 
+						struct tm now_time;
+#ifdef DEBUG_IFERMD						
 						printf("[ermc_ermd] [ermd %s] recv_len : %d \n",ip_ermd, recv_len);
 						for (i = 0; i<recv_len; i++)
 							printf(" %02x ", recv_buf[i]);
@@ -78,13 +90,50 @@ void *client(void *num)
 						{
 							mac_ermd = (char *)malloc(MAC_SIZE*sizeof(char));
 							sprintf(mac_ermd, "%02x%02x%02x%02x%02x%02x", recv_buf[0], recv_buf[1],recv_buf[2], recv_buf[3], recv_buf[4], recv_buf[5]); 
-							
+							log_info("[ermc_ermd] Connection a new client : ip: %s  mac: %s. \n",ip_ermd, mac_ermd);
+						}
+						type = recv_buf[TYPE];
+						num_alarm = recv_buf[NUMALARM]*10+recv_buf[NUMALARM+1];
+						if(type>=0 && type<=4)
+						{
+							//get time
+							time_seconds = time(NULL);
+							localtime_r(&time_seconds, &now_time); //thread-safe
+							sprintf(time_message, "%d/%d/%d %d:%d:%d", (now_time.tm_year+1900), now_time.tm_mon+1, now_time.tm_mday,now_time.tm_hour,now_time.tm_min,now_time.tm_sec);
+							if(type==0)
+							{
+								Alarm alarm;
+								
+								reply = redisCommand(conn, "select 1");
+								reply = redisCommand(conn, "incr mykey");
+								alarm.id = reply->integer;
+								alarm.num = num_alarm;
+								alarm.mac = mac_ermd;
+								strcpy(alarm.time, time_message);
+								get_json_id(alarm.alarmID);
+								reply = redisCommand(conn, "HSET %d title SendAlarm fin 1 id %s master_id ermc1 web_id EscapeRoom device_id %s device_time %s num %d", alarm.id, alarm.alarmID,alarm.mac,alarm.time,alarm.num);
+							}
 						}
 					}
 				}
 				break;
 		}
 	}
+amd_close:
+	if(conn !=NULL)
+		redisFree(conn);
+	if(reply !=NULL)
+		freeReplyObject(reply);
+	if(mac_ermd!=NULL)
+	{
+		log_error("[ermc_ermd] [ermd %s] closed. \n", mac_ermd);
+	}	
+	else
+	{
+		log_error("[ermc_ermd] [ermd] closed. \n");
+	}
+	close(sockfd);
+    pthread_exit(NULL); 		
 }
 
 
