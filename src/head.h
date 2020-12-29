@@ -35,6 +35,9 @@
 
 //Interface ERMC_web
 #define SIZE_ALARMID   19
+#define SSIZE_MAX   1024
+#define PORTEWEB 9090
+#define IP_WEB "47.100.100.146"
 
 typedef struct process
 {
@@ -46,12 +49,12 @@ typedef struct alarmRedis
 {
 	unsigned char *mac;
 	unsigned char time[TIME_SIZE];
-	unsigned char alarmID[SIZE_ALARMID];
 	int num;
 	int id;
 }Alarm;
 
 int interface_ermd();
+int interface_web();
 int get_json_id(unsigned char *id);
 
 #endif

@@ -42,8 +42,7 @@ void sub_quit_signal_handle(int sig)
 				prctl(PR_SET_NAME, "ermc_ermd");
 				//child process dies when parent dies
 				prctl(PR_SET_PDEATHSIG, SIGHUP);
-				//ret = interface_amd();
-				while(1);
+				ret = interface_ermd();
 				return;
 			}
 			else //parent process 
@@ -75,8 +74,7 @@ void sub_quit_signal_handle(int sig)
 				prctl(PR_SET_NAME, "ermc_web");
 				//child process dies when parent dies
 				prctl(PR_SET_PDEATHSIG, SIGHUP);
-				//ret = interface_acca();
-				while(1);
+				ret = interface_web();
 				return;
 			}
 			else 
@@ -282,7 +280,6 @@ int main(int argc, char** argv)
 					break;
 				case 'd': 
 					enable_debug();
-					printf("d\n");
 					break;
 				case 'h': 
 				case '?': 
@@ -368,8 +365,7 @@ int main(int argc, char** argv)
 			prctl(PR_SET_NAME, "ermc_web");
 			//child process dies when parent dies
 			prctl(PR_SET_PDEATHSIG, SIGHUP);
-			while(1);
-			//ret = interface_acca();
+			ret = interface_web();
 			return ret;
 		}
 		else //parent process 

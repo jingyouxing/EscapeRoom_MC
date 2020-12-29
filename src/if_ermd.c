@@ -26,6 +26,23 @@ void ermd_install_signal_handler()
 }
 
 
+int recv_alarm(Alarm alarm)
+{
+	//printf("recv_alarm. alarm.num: %d\n",alarm.num);
+	switch(alarm.num)
+	{
+		case 2:
+			log_info("[ERMD: %s] amdTime: %s, Message: NOTIFICATION_BOX_CLOSED.\n", alarm.mac, alarm.time);
+			break;
+		case 3:
+			log_info("[ERMD: %s] amdTime: %s, Message: NOTIFICATION_BOX_OPENED.\n", alarm.mac, alarm.time);
+			break;
+		default: 
+			log_info("[ERMD: %s] amdTime: %s, Message: ALARM_CRITICAL_MESSAGE_RECEIVED_UNKNOWN.\n", alarm.mac, alarm.time);
+	}
+	return 0;
+}
+
 void *client(void *num)
 {
 	int sockfd = *(int*)num;
@@ -110,8 +127,8 @@ void *client(void *num)
 								alarm.num = num_alarm;
 								alarm.mac = mac_ermd;
 								strcpy(alarm.time, time_message);
-								get_json_id(alarm.alarmID);
-								reply = redisCommand(conn, "HSET %d title SendAlarm fin 1 id %s master_id ermc1 web_id EscapeRoom device_id %s device_time %s num %d", alarm.id, alarm.alarmID,alarm.mac,alarm.time,alarm.num);
+								recv_alarm(alarm);
+								reply = redisCommand(conn, "HSET %d title 0 fin 1 device_id %s device_time %s num %d", alarm.id, alarm.mac,alarm.time,alarm.num);
 							}
 						}
 					}
